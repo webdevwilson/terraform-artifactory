@@ -54,6 +54,7 @@ type LocalRepositoryConfiguration struct {
 	CalculateYumMetadata         bool     `json:"calculateYumMetadata,omitempty"`
 	YumRootDepth                 int      `json:"yumRootDepth,omitempty"`
 	DockerAPIVersion             string   `json:"dockerApiVersion,omitempty"`
+	EnableFileListsIndexing      bool     `json:"enableFileListsIndexing,omitempty"`
 }
 
 // RemoteRepositoryConfiguration for configuring a remote repository
