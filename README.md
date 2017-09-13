@@ -116,6 +116,7 @@ security (e.g., cross-site scripting attacks). Defaults to `false`.
 * `calculate_yum_metadata` - (Optional) Defaults to `false`.
 * `yum_root_depth` - (Optional) Defaults to `0`.
 * `docker_api_version` - (Optional) Docker API compatibility. Must be `V1` or `V2`. Defaults to `V2`.
+* `enable_file_lists_indexing` - (Optional) Defaults to `false`. An indexing option for `yum` repositories.
 
 ---
 
