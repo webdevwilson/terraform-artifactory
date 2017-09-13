@@ -154,7 +154,7 @@ func newLocalRepositoryFromResource(d *schema.ResourceData) *LocalRepositoryConf
 		CalculateYumMetadata:         d.Get("calculate_yum_metadata").(bool),
 		YumRootDepth:                 d.Get("yum_root_depth").(int),
 		DockerAPIVersion:             d.Get("docker_api_version").(string),
-		EnableFileListsIndexing:      d.Get("enable_file_lists_indexing").(string),
+		EnableFileListsIndexing:      d.Get("enable_file_lists_indexing").(bool),
 		PropertySets:                 props,
 	}
 }
