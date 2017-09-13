@@ -115,7 +115,7 @@ func resourceLocalRepository() *schema.Resource {
 				Default:      "V2",
 				ValidateFunc: validation.StringInSlice([]string{"V1", "V2"}, true),
 			},
-			"enable_file_list_indexing": &schema.Schema{
+			"enable_file_lists_indexing": &schema.Schema{
 				Type:         schema.TypeBool,
 				Optional:     true,
 				Default:      false,
