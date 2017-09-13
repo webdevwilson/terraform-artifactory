@@ -64,19 +64,19 @@ Provides support for setting up local repositories in Artifactory.
 ```
 # A Sample NPM registry
 resource "artifactory_local_repository" "localnpm" {
-    key                   = "npm-local"
-    package_type          = "npm"
-    repository_layout_ref = "npm-default"
-    property_sets         = [ "artifactory" ]
+    key             = "npm-local"
+    package_type    = "npm"
+    repo_layout_ref = "npm-default"
+    property_sets   = [ "artifactory" ]
 }
 
 # A Docker repository
 resource "artifact_local_repository" "docker" {
-    key                   = "docker-local"
-    package_type          = "docker"
-    repository_layout_ref = "simple-default"
-    docker_api_version    = "V2"
-    property_sets         = [ "artifactory" ]
+    key                = "docker-local"
+    package_type       = "docker"
+    repo_layout_ref    = "simple-default"
+    docker_api_version = "V2"
+    property_sets      = [ "artifactory" ]
 }
 ```
 
