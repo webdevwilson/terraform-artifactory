@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/hashicorp/terraform/plugin"
-	"github.com/webdevwilson/terraform-provider-artifactory/artifactory"
+	"github.com/kieferrj/terraform-provider-artifactory/builtin/providers/artifactory"
 )
 
 func main() {
