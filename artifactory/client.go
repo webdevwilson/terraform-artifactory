@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 // User represents an Artifactory user
@@ -118,10 +119,11 @@ type VirtualRepositoryConfiguration struct {
 }
 
 type clientConfig struct {
-	user    string
-	pass    string
-	url     string
-	logging bool
+	user     string
+	pass     string
+	url      string
+	logging  bool
+	clientMu sync.Mutex // clientMu protects the client during multi-threaded calls
 }
 
 // Client is used to call Artifactory REST APIs
@@ -145,13 +147,23 @@ type Client interface {
 var _ Client = clientConfig{}
 
 // NewClient constructs a new artifactory client
-func NewClient(username string, pass string, url string, logging bool) Client {
-	return clientConfig{
-		username,
-		pass,
-		strings.TrimRight(url, "/"),
-		logging,
+func NewClient(username string, pass string, url string, logging bool) *clientConfig {
+	return &clientConfig{
+		user:    username,
+		pass:    pass,
+		url:     strings.TrimRight(url, "/"),
+		logging: logging,
 	}
+}
+
+// Lock the client until release
+func (c *clientConfig) Lock() {
+	c.clientMu.Lock()
+}
+
+// Unlock the client after a lock action
+func (c *clientConfig) Unlock() {
+	c.clientMu.Unlock()
 }
 
 // Ping calls the system to verify connectivity
@@ -408,7 +420,11 @@ func (c clientConfig) DeleteGroup(name string) error {
 	return resp.Body.Close()
 }
 
-func (c clientConfig) execute(method string, endpoint string, payload interface{}) (*http.Response, error) {
+func (c clientConfig) execute(method string, endpoint string, payload interface{}) (resp *http.Response, err error) {
+	var req *http.Request
+	c.Lock()
+	defer c.Unlock()
+
 	client := &http.Client{}
 	url := fmt.Sprintf("%s/api/%s", c.url, endpoint)
 	log.Printf("[DEBUG] Sending Request to method/url: %s %s", method, url)
@@ -420,14 +436,14 @@ func (c clientConfig) execute(method string, endpoint string, payload interface{
 		var jsonbuffer []byte
 		jsonpayload = bytes.NewBuffer(jsonbuffer)
 		enc := json.NewEncoder(jsonpayload)
-		err := enc.Encode(payload)
+		err = enc.Encode(payload)
 		if err != nil {
 			log.Printf("[ERROR] Error Encoding Payload: %s", err)
 			return nil, err
 		}
 	}
 
-	req, err := http.NewRequest(method, url, jsonpayload)
+	req, err = http.NewRequest(method, url, jsonpayload)
 	if err != nil {
 		log.Printf("[ERROR] Error creating new request: %s", err)
 		return nil, err
@@ -435,7 +451,11 @@ func (c clientConfig) execute(method string, endpoint string, payload interface{
 	req.SetBasicAuth(c.user, c.pass)
 	req.Header.Add("content-type", "application/json")
 
-	return client.Do(req)
+	resp, err = client.Do(req)
+	if err != nil {
+		err = nil // ignore EOF errors caused by empty response body
+	}
+	return
 }
 
 func (c clientConfig) validateResponse(expectedCode int, action string, resp *http.Response, v interface{}) (err error) {
@@ -456,7 +476,7 @@ func (c clientConfig) validateResponse(expectedCode int, action string, resp *ht
 		reqB := ""
 		if v != nil {
 			jsonbuffer, err = json.Marshal(v)
-			reqB = string(jsonbuffer)
+			reqB = string(jsonbuffer) + "\n"
 		}
 
 		request = fmt.Sprintf(

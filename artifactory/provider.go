@@ -2,11 +2,16 @@ package artifactory
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/hashicorp/terraform/helper/logging"
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/terraform"
 )
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+}
 
 // Provider returns a terraform.resourceProvider
 func Provider() terraform.ResourceProvider {
