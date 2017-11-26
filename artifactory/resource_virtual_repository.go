@@ -13,6 +13,7 @@ func resourceVirtualRepository() *schema.Resource {
 		Read:   resourceVirtualRepositoryRead,
 		Update: resourceVirtualRepositoryUpdate,
 		Delete: resourceVirtualRepositoryDelete,
+		Exists: resourceRepositoryExists,
 		Importer: &schema.ResourceImporter{
 			State: virtualRepositoryImportStatePassthrough,
 		},
@@ -105,6 +106,18 @@ func newVirtualRepositoryFromResource(d *schema.ResourceData) *VirtualRepository
 	}
 }
 
+func resourceRepositoryExists(d *schema.ResourceData, m interface{}) (exists bool, err error) {
+	log.Println("[DEBUG] ")
+	c := m.(Client)
+	key := d.Id()
+	var repo VirtualRepositoryConfiguration
+
+	err = c.GetRepository(key, &repo)
+	exists = (repo.Key == key)
+
+	return
+}
+
 func resourceVirtualRepositoryCreate(d *schema.ResourceData, m interface{}) error {
 	log.Printf("[TRACE] Creating artifactory.virtual_repository Id=%s\n", d.Get("key"))
 	c := m.(Client)
@@ -167,6 +180,7 @@ func resourceVirtualRepositoryDelete(d *schema.ResourceData, m interface{}) erro
 	log.Printf("[TRACE] Deleting artifactory.virtual_repository Id=%s\n", d.Id())
 	c := m.(Client)
 	key := d.Id()
+	d.SetId("")
 	return c.DeleteRepository(key)
 }
 

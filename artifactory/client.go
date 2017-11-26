@@ -118,9 +118,10 @@ type VirtualRepositoryConfiguration struct {
 }
 
 type clientConfig struct {
-	user string
-	pass string
-	url  string
+	user    string
+	pass    string
+	url     string
+	logging bool
 }
 
 // Client is used to call Artifactory REST APIs
@@ -144,11 +145,12 @@ type Client interface {
 var _ Client = clientConfig{}
 
 // NewClient constructs a new artifactory client
-func NewClient(username string, pass string, url string) Client {
+func NewClient(username string, pass string, url string, logging bool) Client {
 	return clientConfig{
 		username,
 		pass,
 		strings.TrimRight(url, "/"),
+		logging,
 	}
 }
 
@@ -176,7 +178,7 @@ func (c clientConfig) GetRepository(key string, v interface{}) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "update repository", resp); err != nil {
+	if err := c.validateResponse(200, "read repository", resp, nil); err != nil {
 		return err
 	}
 
@@ -198,7 +200,7 @@ func (c clientConfig) CreateRepository(key string, v interface{}) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "create repository", resp); err != nil {
+	if err := c.validateResponse(200, "create repository", resp, v); err != nil {
 		return err
 	}
 
@@ -214,7 +216,7 @@ func (c clientConfig) UpdateRepository(key string, v interface{}) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "update repository", resp); err != nil {
+	if err := c.validateResponse(200, "update repository", resp, nil); err != nil {
 		return err
 	}
 
@@ -230,7 +232,7 @@ func (c clientConfig) DeleteRepository(key string) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "delete repository", resp); err != nil {
+	if err := c.validateResponse(200, "delete repository", resp, nil); err != nil {
 		return err
 	}
 
@@ -273,7 +275,7 @@ func (c clientConfig) CreateUser(u *User) error {
 		return err
 	}
 
-	if err := c.validateResponse(201, "create user", resp); err != nil {
+	if err := c.validateResponse(201, "create user", resp, nil); err != nil {
 		return err
 	}
 
@@ -289,7 +291,7 @@ func (c clientConfig) UpdateUser(u *User) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "update user", resp); err != nil {
+	if err := c.validateResponse(200, "update user", resp, u); err != nil {
 		return err
 	}
 
@@ -305,7 +307,7 @@ func (c clientConfig) DeleteUser(name string) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "delete user", resp); err != nil {
+	if err := c.validateResponse(200, "delete user", resp, nil); err != nil {
 		return err
 	}
 
@@ -367,7 +369,7 @@ func (c clientConfig) CreateGroup(g *Group) error {
 		return err
 	}
 
-	if err := c.validateResponse(201, "create group", resp); err != nil {
+	if err := c.validateResponse(201, "create group", resp, g); err != nil {
 		return err
 	}
 
@@ -383,7 +385,7 @@ func (c clientConfig) UpdateGroup(g *Group) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "update group", resp); err != nil {
+	if err := c.validateResponse(200, "update group", resp, g); err != nil {
 		return err
 	}
 
@@ -399,7 +401,7 @@ func (c clientConfig) DeleteGroup(name string) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "delete group", resp); err != nil {
+	if err := c.validateResponse(200, "delete group", resp, nil); err != nil {
 		return err
 	}
 
@@ -436,21 +438,55 @@ func (c clientConfig) execute(method string, endpoint string, payload interface{
 	return client.Do(req)
 }
 
-func (c clientConfig) validateResponse(expectedCode int, action string, resp *http.Response) (err error) {
-	if resp.StatusCode != expectedCode {
+func (c clientConfig) validateResponse(expectedCode int, action string, resp *http.Response, v interface{}) (err error) {
+	var jsonbuffer []byte
+	bad_response := resp.StatusCode != expectedCode
+
+	if bad_response || c.logging {
 		response := ""
-		if resp, err := ioutil.ReadAll(resp.Body); err == nil {
-			response = fmt.Sprintf(" Response: %s", string(resp))
+		if respBody, err := ioutil.ReadAll(resp.Body); err == nil {
+			response = fmt.Sprintf(">>> Response:\n%s %s\n%s\n\n%s",
+				resp.Proto,
+				resp.Status,
+				c.buildHeaderString(resp.Header),
+				string(respBody),
+			)
 		}
 		request := ""
-		if req, err := ioutil.ReadAll(resp.Request.Body); err == nil {
-			headers := map[string][]string{}
-			for name, header := range resp.Request.Header {
-				headers[name] = header
-			}
-			request = fmt.Sprintf(" Request:%s\n%s", headers, string(req))
+		reqB := ""
+		if v != nil {
+			jsonbuffer, err = json.Marshal(v)
+			reqB = string(jsonbuffer)
 		}
-		return fmt.Errorf("Failed to %s. Status: %s.%s%s", action, resp.Status, request, response)
+
+		request = fmt.Sprintf(
+			"\n>>> Request:\n%s %s %s\n%s\n\n%s",
+			resp.Request.Method,
+			resp.Request.URL.Path,
+			resp.Request.Proto,
+			c.buildHeaderString(resp.Request.Header),
+			reqB,
+		)
+
+		logpayload := fmt.Sprintf("[DEBUG] Making call to %s to perform '%s'.\n%s\n%s", resp.Request.URL.Host, action, request, response)
+		if bad_response {
+			err = fmt.Errorf(logpayload)
+		}
+
+		if c.logging {
+			log.Println(logpayload)
+		}
 	}
-	return nil
+
+	return
+}
+
+func (c clientConfig) buildHeaderString(headers http.Header) (str string) {
+	resp := []string{}
+	for name, header := range headers {
+		for _, header_line := range header {
+			resp = append(resp, name+": "+header_line)
+		}
+	}
+	return strings.Join(resp, "\n")
 }

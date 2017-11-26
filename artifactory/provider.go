@@ -3,6 +3,7 @@ package artifactory
 import (
 	"fmt"
 
+	"github.com/hashicorp/terraform/helper/logging"
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/terraform"
 )
@@ -48,7 +49,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	user := d.Get("username").(string)
 	pass := d.Get("password").(string)
 	url := d.Get("url").(string)
-	client := NewClient(user, pass, url)
+	client := NewClient(user, pass, url, logging.IsDebugOrHigher())
 
 	// fail early. validate the connection to Artifactory
 	if err := client.Ping(); err != nil {
