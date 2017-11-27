@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 // User represents an Artifactory user
@@ -122,8 +122,8 @@ type clientConfig struct {
 	user     string
 	pass     string
 	url      string
-	logging  bool
-	clientMu sync.Mutex // clientMu protects the client during multi-threaded calls
+	clientMu sync.Mutex // clientMu protects the client during multi-threaded calls]
+	client   *http.Client
 }
 
 // Client is used to call Artifactory REST APIs
@@ -147,12 +147,11 @@ type Client interface {
 var _ Client = clientConfig{}
 
 // NewClient constructs a new artifactory client
-func NewClient(username string, pass string, url string, logging bool) *clientConfig {
+func NewClient(username string, pass string, url string) *clientConfig {
 	return &clientConfig{
-		user:    username,
-		pass:    pass,
-		url:     strings.TrimRight(url, "/"),
-		logging: logging,
+		user: username,
+		pass: pass,
+		url:  strings.TrimRight(url, "/"),
 	}
 }
 
@@ -190,7 +189,7 @@ func (c clientConfig) GetRepository(key string, v interface{}) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "read repository", resp, nil); err != nil {
+	if err := c.validateResponse(200, resp.StatusCode, "read repository"); err != nil {
 		return err
 	}
 
@@ -212,7 +211,7 @@ func (c clientConfig) CreateRepository(key string, v interface{}) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "create repository", resp, v); err != nil {
+	if err := c.validateResponse(200, resp.StatusCode, "create repository"); err != nil {
 		return err
 	}
 
@@ -228,7 +227,7 @@ func (c clientConfig) UpdateRepository(key string, v interface{}) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "update repository", resp, nil); err != nil {
+	if err := c.validateResponse(200, resp.StatusCode, "update repository"); err != nil {
 		return err
 	}
 
@@ -244,7 +243,7 @@ func (c clientConfig) DeleteRepository(key string) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "delete repository", resp, nil); err != nil {
+	if err := c.validateResponse(200, resp.StatusCode, "delete repository"); err != nil {
 		return err
 	}
 
@@ -287,7 +286,7 @@ func (c clientConfig) CreateUser(u *User) error {
 		return err
 	}
 
-	if err := c.validateResponse(201, "create user", resp, nil); err != nil {
+	if err := c.validateResponse(201, resp.StatusCode, "create user"); err != nil {
 		return err
 	}
 
@@ -303,7 +302,7 @@ func (c clientConfig) UpdateUser(u *User) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "update user", resp, u); err != nil {
+	if err := c.validateResponse(200, resp.StatusCode, "update user"); err != nil {
 		return err
 	}
 
@@ -319,7 +318,7 @@ func (c clientConfig) DeleteUser(name string) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "delete user", resp, nil); err != nil {
+	if err := c.validateResponse(200, resp.StatusCode, "delete user"); err != nil {
 		return err
 	}
 
@@ -381,7 +380,7 @@ func (c clientConfig) CreateGroup(g *Group) error {
 		return err
 	}
 
-	if err := c.validateResponse(201, "create group", resp, g); err != nil {
+	if err := c.validateResponse(201, resp.StatusCode, "create group"); err != nil {
 		return err
 	}
 
@@ -397,7 +396,7 @@ func (c clientConfig) UpdateGroup(g *Group) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "update group", resp, g); err != nil {
+	if err := c.validateResponse(200, resp.StatusCode, "update group"); err != nil {
 		return err
 	}
 
@@ -413,7 +412,7 @@ func (c clientConfig) DeleteGroup(name string) error {
 		return err
 	}
 
-	if err := c.validateResponse(200, "delete group", resp, nil); err != nil {
+	if err := c.validateResponse(200, resp.StatusCode, "delete group"); err != nil {
 		return err
 	}
 
@@ -425,9 +424,7 @@ func (c clientConfig) execute(method string, endpoint string, payload interface{
 	c.Lock()
 	defer c.Unlock()
 
-	client := &http.Client{}
 	url := fmt.Sprintf("%s/api/%s", c.url, endpoint)
-	log.Printf("[DEBUG] Sending Request to method/url: %s %s", method, url)
 
 	var jsonpayload *bytes.Buffer
 	if payload == nil {
@@ -451,62 +448,17 @@ func (c clientConfig) execute(method string, endpoint string, payload interface{
 	req.SetBasicAuth(c.user, c.pass)
 	req.Header.Add("content-type", "application/json")
 
-	resp, err = client.Do(req)
+	resp, err = c.client.Do(req)
 	if err != nil {
 		err = nil // ignore EOF errors caused by empty response body
 	}
+	time.Sleep(time.Second * 2)
 	return
 }
 
-func (c clientConfig) validateResponse(expectedCode int, action string, resp *http.Response, v interface{}) (err error) {
-	var jsonbuffer []byte
-	bad_response := resp.StatusCode != expectedCode
-
-	if bad_response || c.logging {
-		response := ""
-		if respBody, err := ioutil.ReadAll(resp.Body); err == nil {
-			response = fmt.Sprintf(">>> Response:\n%s %s\n%s\n\n%s",
-				resp.Proto,
-				resp.Status,
-				c.buildHeaderString(resp.Header),
-				string(respBody),
-			)
-		}
-		request := ""
-		reqB := ""
-		if v != nil {
-			jsonbuffer, err = json.Marshal(v)
-			reqB = string(jsonbuffer) + "\n"
-		}
-
-		request = fmt.Sprintf(
-			"\n>>> Request:\n%s %s %s\n%s\n\n%s",
-			resp.Request.Method,
-			resp.Request.URL.Path,
-			resp.Request.Proto,
-			c.buildHeaderString(resp.Request.Header),
-			reqB,
-		)
-
-		logpayload := fmt.Sprintf("[DEBUG] Making call to %s to perform '%s'.\n%s\n%s", resp.Request.URL.Host, action, request, response)
-		if bad_response {
-			err = fmt.Errorf(logpayload)
-		}
-
-		if c.logging {
-			log.Println(logpayload)
-		}
+func (c clientConfig) validateResponse(expected int, actual int, action string) (err error) {
+	if expected != actual {
+		err = fmt.Errorf("Expected %d for '%s', got '%d'", expected, action, actual)
 	}
-
 	return
-}
-
-func (c clientConfig) buildHeaderString(headers http.Header) (str string) {
-	resp := []string{}
-	for name, header := range headers {
-		for _, header_line := range header {
-			resp = append(resp, name+": "+header_line)
-		}
-	}
-	return strings.Join(resp, "\n")
 }
