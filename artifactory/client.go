@@ -452,7 +452,7 @@ func (c clientConfig) execute(method string, endpoint string, payload interface{
 	if err == io.EOF {
 		err = nil // ignore EOF errors caused by empty response body
 	}
-	time.Sleep(time.Second * 2)
+
 	return
 }
 
