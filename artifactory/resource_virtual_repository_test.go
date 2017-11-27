@@ -61,8 +61,8 @@ resource "artifactory_virtual_repository" "npm" {
     default_deployment_repo                            = "${artifactory_local_repository.npm_private.key}"
     debian_trivial_layout                              = false
     repositories                                       = [
-        "${artifactory_local_repository.npm_private.key}",
-        "${artifactory_remote_repository.npm_public.key}"
+        "${artifactory_remote_repository.npm_public.key}",
+        "${artifactory_local_repository.npm_private.key}"
     ]
 }`
 
