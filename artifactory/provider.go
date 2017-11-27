@@ -56,7 +56,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	pass := d.Get("password").(string)
 	url := d.Get("url").(string)
 	c := NewClient(user, pass, url)
-	hc := &http.Client{ Transport: http.DefaultTransport }
+	hc := &http.Client{Transport: http.DefaultTransport}
 	hc.Transport = logging.NewTransport("Artifactory", hc.Transport)
 	c.client = hc
 
