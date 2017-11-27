@@ -449,7 +449,7 @@ func (c clientConfig) execute(method string, endpoint string, payload interface{
 	req.Header.Add("content-type", "application/json")
 
 	resp, err = c.client.Do(req)
-	if err != nil {
+	if err == io.EOF {
 		err = nil // ignore EOF errors caused by empty response body
 	}
 	time.Sleep(time.Second * 2)
