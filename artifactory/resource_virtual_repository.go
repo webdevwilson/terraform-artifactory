@@ -179,7 +179,6 @@ func resourceVirtualRepositoryDelete(d *schema.ResourceData, m interface{}) erro
 	log.Printf("[TRACE] Deleting artifactory.virtual_repository Id=%s\n", d.Id())
 	c := m.(Client)
 	key := d.Id()
-	d.SetId("")
 	return c.DeleteRepository(key)
 }
 
