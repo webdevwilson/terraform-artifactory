@@ -453,7 +453,7 @@ func (c clientConfig) execute(method string, endpoint string, payload interface{
 		err = nil // ignore EOF errors caused by empty response body
 	}
 
-	return
+	return resp, err
 }
 
 func (c clientConfig) validateResponse(expected int, actual int, action string) (err error) {
