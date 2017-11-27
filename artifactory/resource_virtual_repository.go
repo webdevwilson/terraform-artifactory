@@ -107,7 +107,6 @@ func newVirtualRepositoryFromResource(d *schema.ResourceData) *VirtualRepository
 }
 
 func resourceRepositoryExists(d *schema.ResourceData, m interface{}) (exists bool, err error) {
-	log.Println("[DEBUG] ")
 	c := m.(Client)
 	key := d.Id()
 	var repo VirtualRepositoryConfiguration
