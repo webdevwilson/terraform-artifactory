@@ -147,11 +147,12 @@ type Client interface {
 var _ Client = clientConfig{}
 
 // NewClient constructs a new artifactory client
-func NewClient(username string, pass string, url string) *clientConfig {
+func NewClient(username, pass, url string, client *http.Client) *clientConfig {
 	return &clientConfig{
-		user: username,
-		pass: pass,
-		url:  strings.TrimRight(url, "/"),
+		user:   username,
+		pass:   pass,
+		url:    strings.TrimRight(url, "/"),
+		client: client,
 	}
 }
 
